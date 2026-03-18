@@ -1,21 +1,13 @@
-db_path:
-  permanent_path: "/app/storage/private/faces/permanent"
-  semi_temporary_path: "/app/storage/private/faces/semi-temporary"
-  temporary_path: "/app/storage/private/faces/temporary"
-  active_db_path: "/app/storage/private/faces/active"
-
-deepface_settings:
-  model_name: "Facenet512"
-  detector_backend: "yolov8m"
-  face_score_threshold: 0.7
-  recognition_threshold: 0.6 # 0.5 for VGG-Face, 0.6 for Facenet512
+detection_settings:
+  model_path: "/app/storage/private/models/weight.hdf5"
+  output_dir: '/app/storage/private/output'
 
 cameras:
   - name: "webcam1"
-    url: "rtsp://mediamtx:8554/input/webcam1"
+    url: "rtsp://localhost:8554/input/webcam1"
     enabled: true
     detect_fps: 5
-    resize: [640, 360]
+    resize: [224, 224]
     show_frame: false
 
 snapshot:
@@ -24,7 +16,6 @@ snapshot:
 
 mqtt:
   enabled: true
-  event_topic_prefix: "facerecognition/events"
-  register_topic: "facerecognition/register"
-  command_topic_prefix: "facerecognition/cmd"
-  state_topic_prefix: "facerecognition/state"
+  event_topic_prefix: "sexualdetection/events"
+  command_topic_prefix: "sexualdetection/cmd"
+  state_topic_prefix: "sexualdetection/state"
