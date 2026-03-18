@@ -4,7 +4,7 @@ detection_settings:
 
 cameras:
   - name: "webcam1"
-    url: "rtsp://localhost:8554/input/webcam1"
+    url: "rtsp://mediamtx:8554/input/webcam1"
     enabled: true
     detect_fps: 5
     resize: [224, 224]

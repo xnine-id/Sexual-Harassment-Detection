@@ -28,7 +28,7 @@ def load_config(config_file: str) -> Dict[str, Any]:
         config = yaml.safe_load(f)
 
     required = {
-        "detection_settings": {"model_path": str, "detection_threshold": float, "output_dir": str},
+        "detection_settings": {"model_path": str, "output_dir": str},
         "cameras": [{"name": str, "url": str, "enabled": bool}],
         "snapshot": {"enabled": bool, "output_dir": str},
         "mqtt": {

@@ -1,7 +1,6 @@
 from typing import Any, Dict
 import cv2
 from cv2.typing import MatLike
-import numpy as np
 
 
 class FrameRenderer:

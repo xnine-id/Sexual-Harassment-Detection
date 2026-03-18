@@ -1,0 +1,31 @@
+services:
+  sexual-harassment-detection:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    env_file:
+      - .env
+    environment:
+      MQTT_HOST: mqtt
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,gpu
+    volumes:
+      - ./configs/docker_config.yml:/app/configs/config.yml:ro
+      - ./storage:/app/storage:rw
+      - /home/jeremyjfn/.keras:/root/.keras:rw
+    ports:
+      - ${PORT}:${PORT}
+    networks:
+      - default
+      - deepface-engine_default
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu, compute, utility ]
+
+networks:
+  deepface-engine_default:
+    external: true

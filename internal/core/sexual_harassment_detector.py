@@ -1,13 +1,13 @@
 from cv2.typing import MatLike
 import numpy as np
 import logging
-import cv2
 from typing import Dict, Any
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
 
 logger = logging.getLogger("SEXUAL_DETECTION")
+
 
 class SexualHarassmentDetector:
     def __init__(self, config: Dict[str, Any]):
@@ -33,7 +33,7 @@ class SexualHarassmentDetector:
         result = {
             "class": int(class_label),
             "label": "Harassment" if class_label == 1 else "Non-Harassment",
-            "score": prob
+            "score": prob,
         }
 
         return result

@@ -1,0 +1,10 @@
+.env
+*.pyc
+*.log
+.DS_Store
+docker/
+venv/
+storage/
+configs/
+__pycache__/
+.git/

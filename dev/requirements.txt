@@ -1,0 +1,5 @@
+streamlit
+numpy
+tensorflow[and-cuda]
+gdown
+opencv-python

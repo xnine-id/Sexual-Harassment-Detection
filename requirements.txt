@@ -1,7 +1,5 @@
-streamlit
 numpy
-tensorflow[and-cuda]
-gdown
+tensorflow==2.17.0
 opencv-python
 fastapi
 uvicorn
