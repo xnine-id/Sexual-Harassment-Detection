@@ -1,5 +1,11 @@
 streamlit
 numpy
-tensorflow
+tensorflow[and-cuda]
 gdown
 opencv-python
+fastapi
+uvicorn
+paho-mqtt
+pyyaml
+python-dotenv
+python-multipart
