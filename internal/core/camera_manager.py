@@ -1,10 +1,11 @@
 import threading
 import logging
 import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 from internal.core.camera_processor import CameraProcessor
 from internal.core.sexual_harassment_detector import SexualHarassmentDetector
 from internal.services.mqtt_service import MQTTService
+from internal.utils.config_loader import Config
 
 logger = logging.getLogger("CAMERA_MANAGER")
 
@@ -14,7 +15,7 @@ class CameraManager:
 
     def __init__(
         self,
-        config: Dict[str, Any],
+        config: Config,
         sexual_harassment_detector: SexualHarassmentDetector,
         mqtt_service: Optional[MQTTService] = None,
     ):
@@ -30,10 +31,10 @@ class CameraManager:
     def _create_camera_processors(self):
         """Create processor instances for each enabled camera"""
 
-        for cam_config in self.config["cameras"]:
+        for cam_config in self.config.cameras:
             processor = CameraProcessor(
                 cam_config=cam_config,
-                snapshot_config=self.config["snapshot"],
+                snapshot_config=self.config.snapshot,
                 mqtt_service=self.mqtt_service,
                 sexual_harassment_detector=self.sexual_harassment_detector,
                 stop_event=self.stop_event,

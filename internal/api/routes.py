@@ -3,14 +3,15 @@ import os
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from internal.core.camera_manager import CameraManager
+from internal.utils.config_loader import Config
 
 logger = logging.getLogger("API_ROUTES")
 
 
-def create_router(camera_manager: CameraManager, config: dict = None):
+def create_router(camera_manager: CameraManager, config: Config):
     router = APIRouter()
 
-    snapshot_dir = config.get("snapshot", {}).get("output_dir") if config else None
+    snapshot_dir = config.snapshot.output_dir
 
     @router.get(
         "/snapshots/{date_str}/{filename}",

@@ -1,14 +1,13 @@
 detection_settings:
   model_path: "/app/storage/private/models/weight.hdf5"
   output_dir: '/app/storage/private/output'
+  resize: [224, 224]
 
 cameras:
   - name: "webcam1"
     url: "rtsp://mediamtx:8554/input/webcam1"
     enabled: true
     detect_fps: 5
-    resize: [224, 224]
-    show_frame: false
 
 snapshot:
   enabled: true
@@ -16,6 +15,6 @@ snapshot:
 
 mqtt:
   enabled: true
-  event_topic_prefix: "sexualdetection/events"
-  command_topic_prefix: "sexualdetection/cmd"
-  state_topic_prefix: "sexualdetection/state"
+  event_topic_prefix: "sexual_detection/events"
+  command_topic_prefix: "sexual_detection/cmd"
+  state_topic_prefix: "sexual_detection/state"

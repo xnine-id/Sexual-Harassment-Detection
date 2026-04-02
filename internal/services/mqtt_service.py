@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 from paho.mqtt import client as mqtt
+from internal.utils.config_loader import Config
 
 logger = logging.getLogger("MQTT")
 
@@ -11,16 +12,12 @@ logger = logging.getLogger("MQTT")
 class MQTTService:
     """Centralized MQTT Service for publishing events, states, and handling commands"""
 
-    def __init__(self, config):
-        self.config = config.get("mqtt", {})
-        self.enabled = self.config.get("enabled", True)
-        self.event_topic = self.config.get(
-            "event_topic_prefix", "fightdetection/events"
-        )
-        self.cmd_prefix = self.config.get("command_topic_prefix", "fightdetection/cmd")
-        self.state_prefix = self.config.get(
-            "state_topic_prefix", "fightdetection/state"
-        )
+    def __init__(self, config: Config):
+        self.config = config.mqtt
+        self.enabled = self.config.enabled
+        self.event_topic = self.config.event_topic_prefix
+        self.cmd_prefix = self.config.command_topic_prefix
+        self.state_prefix = self.config.state_topic_prefix
 
         self.client = None
         self.command_callbacks = {}  # cam_name -> callback function

@@ -10,16 +10,17 @@ from cv2.typing import MatLike
 
 from internal.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
 from internal.services.mqtt_service import MQTTService
+from internal.utils.config_loader import SnapshotConfig
 
 logger = logging.getLogger("SEXUAL_HARASSMENT_TRACKER")
 
 
 class SexualHarassmentTracker(SexualHarassmentTrackerInt):
     def __init__(
-        self, snapshot_config: Dict[str, Any], cam_name: str, mqtt_service: MQTTService
+        self, snapshot_config: SnapshotConfig, cam_name: str, mqtt_service: MQTTService
     ):
-        self.snapshot_enabled = snapshot_config["enabled"]
-        self.output_dir = snapshot_config["output_dir"]
+        self.snapshot_enabled = snapshot_config.enabled
+        self.output_dir = snapshot_config.output_dir
         self.cam_name = cam_name
         self.mqtt_service = mqtt_service
 

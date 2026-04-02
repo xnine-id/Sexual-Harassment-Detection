@@ -10,6 +10,7 @@ from internal.services.frame_renderer import FrameRenderer
 from internal.services.mqtt_service import MQTTService
 from internal.core.sexual_harassment_detector import SexualHarassmentDetector
 from internal.services.sexual_harassment_tracker import SexualHarassmentTracker
+from internal.utils.config_loader import CameraConfig, SnapshotConfig
 
 logger = logging.getLogger("CAM_PROCESSOR")
 
@@ -19,22 +20,18 @@ class CameraProcessor:
 
     def __init__(
         self,
-        cam_config: Dict[str, Any],
-        snapshot_config: Dict[str, Any],
+        cam_config: CameraConfig,
+        snapshot_config: SnapshotConfig,
         mqtt_service: Optional[MQTTService],
         sexual_harassment_detector: SexualHarassmentDetector,
         stop_event: Event,
     ):
         # Configuration
-        self.cam_name: str = cam_config["name"]
-        self.show_frame: bool = cam_config.get("show_frame", False)
-        self.url: str = cam_config["url"]
-        self.detect_fps: int = cam_config["detect_fps"]
-        self.is_running: bool = cam_config["enabled"]
-
-        resize_config: List[int] = cam_config["resize"]
-        self.width: int = resize_config[0]
-        self.height: int = resize_config[1]
+        self.cam_name = cam_config.name
+        self.show_frame = cam_config.show_frame
+        self.url = cam_config.url
+        self.detect_fps = cam_config.detect_fps
+        self.is_running = cam_config.enabled
 
         self.stop_event = stop_event
 
@@ -42,13 +39,13 @@ class CameraProcessor:
         self.cap: Optional[cv2.VideoCapture] = None
         self.latest_captured_frame: Optional[MatLike] = None
         self.capture_lock: Lock = Lock()
-        self.capture_ret: bool = False
-        self.new_captured_frame_event: Event = Event()
+        self.capture_ret = False
+        self.new_captured_frame_event = Event()
         self.reconnect_delay: float = 1.0
         self.max_reconnect_delay: float = 30.0
 
         # 2. Detection State
-        self.sexual_harassment_detector: SexualHarassmentDetector = sexual_harassment_detector
+        self.sexual_harassment_detector = sexual_harassment_detector
         self.latest_raw_frame: Optional[MatLike] = None
         self.raw_frame_lock: Lock = Lock()
         self.current_detection: Optional[Dict[str, Any]] = None
@@ -58,12 +55,6 @@ class CameraProcessor:
         # 3. Processing & Lazy Encoding State
         self.frame_to_render: Optional[MatLike] = None
         self.render_lock: Lock = Lock()
-        self._resize_cache: Dict[str, Any] = {
-            "input_shape": None,
-            "new_size": None,
-            "offsets": None,
-            "canvas": None,
-        }
 
         # 4. Services
         self.mqtt_service: Optional[MQTTService] = mqtt_service
@@ -158,42 +149,8 @@ class CameraProcessor:
                     self.stop_event.wait(0.01)
                 continue
 
-        logger.debug(f"[{self.cam_name}] Capture loop stopping")
         if self.cap is not None:
             self.cap.release()
-
-    def _resize_with_aspect_ratio(
-        self, image: MatLike, target_width: int, target_height: int
-    ) -> MatLike:
-        """Resize image to target dimensions while maintaining aspect ratio and padding with black"""
-        h, w = image.shape[:2]
-
-        # Use cached values if input shape hasn't changed
-        if self._resize_cache["input_shape"] != (h, w):
-            ratio = min(target_width / w, target_height / h)
-            new_w, new_h = int(w * ratio), int(h * ratio)
-
-            x_offset = (target_width - new_w) // 2
-            y_offset = (target_height - new_h) // 2
-
-            self._resize_cache.update(
-                {
-                    "input_shape": (h, w),
-                    "new_size": (new_w, new_h),
-                    "offsets": (x_offset, y_offset),
-                    "canvas": np.zeros(
-                        (target_height, target_width, 3), dtype=np.uint8
-                    ),
-                }
-            )
-
-        new_w, new_h = self._resize_cache["new_size"]
-        x_offset, y_offset = self._resize_cache["offsets"]
-
-        resized = cv2.resize(image, (new_w, new_h))
-        canvas = self._resize_cache["canvas"].copy()
-        canvas[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
-        return canvas
 
     def get_latest_frame(self) -> Optional[bytes]:
         """Get the latest processed frame as JPEG bytes (lazy encoding)"""
@@ -245,32 +202,29 @@ class CameraProcessor:
 
     def _process_frame(self, frame: MatLike):
         """Main frame processing pipeline: Resize -> Detect -> Render -> Track -> Save"""
-        # 1. Resize
-        frame_resized = self._resize_with_aspect_ratio(frame, self.width, self.height)
-
-        # 2. Provide to detector
+        # 1. Provide to detector (Detector will handle resize in its run method)
         with self.raw_frame_lock:
-            self.latest_raw_frame = frame_resized
+            self.latest_raw_frame = frame
         self.new_frame_event.set()
 
-        # 3. Get latest result (instant)
+        # 2. Get latest result (instant)
         result = None
         with self.detections_lock:
             result = self.current_detection
 
-        # 4. Render
+        # 3. Render
         frame_display = frame
         if result:
             frame_display = self.frame_renderer.render(frame, result)
 
-        # 5. Update tracker
+        # 4. Update tracker
         self.sexual_harassment_tracker.update(frame_display, result)
 
-        # 6. Save for lazy encoding
+        # 5. Save for lazy encoding
         with self.render_lock:
             self.frame_to_render = frame_display
 
-        # 7. Display (Optional)
+        # 6. Display (Optional)
         if self.show_frame:
             cv2.imshow(f"Stream: {self.cam_name}", frame_display)
             if cv2.waitKey(1) & 0xFF == ord("q"):
