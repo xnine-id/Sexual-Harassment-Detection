@@ -1,10 +1,11 @@
 import cv2
 from cv2.typing import MatLike
-import numpy as np
 import threading
 import time
 import logging
-from typing import Dict, List, Any, Optional
+import queue
+import subprocess
+from typing import Dict, Any, Optional
 from threading import Event, Lock
 from internal.services.frame_renderer import FrameRenderer
 from internal.services.mqtt_service import MQTTService
@@ -22,44 +23,52 @@ class CameraProcessor:
         self,
         cam_config: CameraConfig,
         snapshot_config: SnapshotConfig,
-        mqtt_service: Optional[MQTTService],
         sexual_harassment_detector: SexualHarassmentDetector,
-        stop_event: Event,
+        frame_renderer: FrameRenderer,
+        mqtt_service: Optional[MQTTService] = None,
+        stop_event: Optional[Event] = None,
+        output_path: Optional[str] = None,
     ):
         # Configuration
         self.cam_name = cam_config.name
-        self.show_frame = cam_config.show_frame
         self.url = cam_config.url
         self.detect_fps = cam_config.detect_fps
         self.is_running = cam_config.enabled
+        self.width = 0
+        self.height = 0
 
-        self.stop_event = stop_event
+        self.stop_event = stop_event or Event()
+        self.is_live_stream = False
+        self.output_path = output_path
+        self.out: Optional[cv2.VideoWriter] = None
+        self.ffmpeg_proc: Optional[subprocess.Popen] = None
+        self.frame_queue: queue.Queue = queue.Queue(maxsize=128)
 
         # 1. Capture State
         self.cap: Optional[cv2.VideoCapture] = None
         self.latest_captured_frame: Optional[MatLike] = None
-        self.capture_lock: Lock = Lock()
+        self.capture_lock = Lock()
         self.capture_ret = False
         self.new_captured_frame_event = Event()
-        self.reconnect_delay: float = 1.0
-        self.max_reconnect_delay: float = 30.0
+        self.reconnect_delay = 1.0
+        self.max_reconnect_delay = 30.0
 
         # 2. Detection State
         self.sexual_harassment_detector = sexual_harassment_detector
         self.latest_raw_frame: Optional[MatLike] = None
-        self.raw_frame_lock: Lock = Lock()
+        self.raw_frame_lock = Lock()
         self.current_detection: Optional[Dict[str, Any]] = None
-        self.detections_lock: Lock = Lock()
-        self.new_frame_event: Event = Event()
+        self.detections_lock = Lock()
+        self.new_frame_event = Event()
 
         # 3. Processing & Lazy Encoding State
         self.frame_to_render: Optional[MatLike] = None
-        self.render_lock: Lock = Lock()
+        self.render_lock = Lock()
 
         # 4. Services
         self.mqtt_service: Optional[MQTTService] = mqtt_service
-        self.frame_renderer: FrameRenderer = FrameRenderer()
-        self.sexual_harassment_tracker: SexualHarassmentTracker = SexualHarassmentTracker(
+        self.frame_renderer = frame_renderer
+        self.sexual_harassment_tracker = SexualHarassmentTracker(
             snapshot_config=snapshot_config,
             cam_name=self.cam_name,
             mqtt_service=self.mqtt_service,
@@ -87,9 +96,42 @@ class CameraProcessor:
         """Initialize video capture"""
         self.cap = cv2.VideoCapture(self.url)
         fps = self.cap.get(cv2.CAP_PROP_FPS)
+        frame_count = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
         if fps <= 0:
             fps = 30.0
-        logger.info(f"[{self.cam_name}] Camera initialized (FPS: {fps})")
+
+        if frame_count <= 0:
+            self.is_live_stream = True
+
+        if self.output_path:
+            self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-f", "rawvideo",
+                "-vcodec", "rawvideo",
+                "-s", f"{self.width}x{self.height}",
+                "-pix_fmt", "bgr24",
+                "-r", str(fps),
+                "-i", "-",
+                "-vcodec", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-preset", "fast",
+                self.output_path,
+            ]
+            self.ffmpeg_proc = subprocess.Popen(
+                ffmpeg_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            logger.debug(
+                f"[{self.cam_name}] FFmpeg writer initialized ({self.width}x{self.height} @ {fps}fps): {self.output_path}"
+            )
+
+        logger.info(f"[{self.cam_name}] Camera initialized (FPS: {fps}, Frame Count: {frame_count})")
 
     def _handle_reconnection(self):
         """Handle camera reconnection logic with exponential backoff"""
@@ -129,8 +171,16 @@ class CameraProcessor:
                 with self.capture_lock:
                     self.capture_ret = True
                     self.latest_captured_frame = frame
+                
+                if not self.is_live_stream:
+                    # In file mode, we wait for space in queue to avoid dropping frames
+                    self.frame_queue.put(frame, block=True)
+                
                 self.new_captured_frame_event.set()
             else:
+                if not self.is_live_stream:
+                    self.stop_event.set()
+
                 not_ret_count += 1
                 with self.capture_lock:
                     self.capture_ret = False
@@ -151,6 +201,14 @@ class CameraProcessor:
 
         if self.cap is not None:
             self.cap.release()
+
+        if self.ffmpeg_proc is not None:
+            try:
+                self.ffmpeg_proc.stdin.close()
+                self.ffmpeg_proc.wait(timeout=10)
+            except Exception as e:
+                logger.warning(f"[{self.cam_name}] FFmpeg cleanup error: {e}")
+                self.ffmpeg_proc.kill()
 
     def get_latest_frame(self) -> Optional[bytes]:
         """Get the latest processed frame as JPEG bytes (lazy encoding)"""
@@ -224,11 +282,11 @@ class CameraProcessor:
         with self.render_lock:
             self.frame_to_render = frame_display
 
-        # 6. Display (Optional)
-        if self.show_frame:
-            cv2.imshow(f"Stream: {self.cam_name}", frame_display)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                self.stop_event.set()
+        if self.ffmpeg_proc is not None:
+            try:
+                self.ffmpeg_proc.stdin.write(frame_display.tobytes())
+            except BrokenPipeError:
+                logger.warning(f"[{self.cam_name}] FFmpeg pipe closed unexpectedly")
 
     def run(self) -> None:
         """Main processing loop (consuming from capture thread)"""
@@ -236,8 +294,8 @@ class CameraProcessor:
 
         # Start threads
         threads = [
-            threading.Thread(target=self._capture_loop, name="Capture"),
-            threading.Thread(target=self._detection_loop, name="Detection"),
+            threading.Thread(target=self._capture_loop, name=f"Capture_{self.cam_name}"),
+            threading.Thread(target=self._detection_loop, name=f"Detection_{self.cam_name}"),
         ]
         for t in threads:
             t.start()
@@ -247,15 +305,24 @@ class CameraProcessor:
                 self.stop_event.wait(0.5)
                 continue
 
-            # 1. Get frame from capture thread
-            if not self.new_captured_frame_event.wait(timeout=1.0):
-                continue
-            self.new_captured_frame_event.clear()
-
+            # 1. Get frame
             frame = None
-            with self.capture_lock:
-                if self.capture_ret and self.latest_captured_frame is not None:
-                    frame = self.latest_captured_frame.copy()
+            if self.is_live_stream:
+                if not self.new_captured_frame_event.wait(timeout=1.0):
+                    continue
+                self.new_captured_frame_event.clear()
+
+                with self.capture_lock:
+                    if self.capture_ret and self.latest_captured_frame is not None:
+                        frame = self.latest_captured_frame.copy()
+            else:
+                # File mode: pull from queue
+                try:
+                    frame = self.frame_queue.get(timeout=1.0)
+                except queue.Empty:
+                    if self.stop_event.is_set():
+                        break
+                    continue
 
             if frame is not None:
                 self._process_frame(frame)

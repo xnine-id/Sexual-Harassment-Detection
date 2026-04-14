@@ -1,3 +1,4 @@
+from internal.utils.config_loader import DetectionSettings
 import cv2
 from cv2.typing import MatLike
 import numpy as np
@@ -12,9 +13,8 @@ logger = logging.getLogger("SEXUAL_DETECTION")
 
 
 class SexualHarassmentDetector:
-    def __init__(self, config: Config):
-        self.config = config
-        self.detection_settings = self.config.detection_settings
+    def __init__(self, detection_settings: DetectionSettings):
+        self.detection_settings = detection_settings
         self.base_model = VGG16(weights="imagenet", include_top=False)
         self.model = load_model(self.detection_settings.model_path)
 

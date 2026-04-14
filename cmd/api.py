@@ -16,6 +16,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from internal.utils.config_loader import load_config
 from internal.services.mqtt_service import MQTTService
+from internal.services.frame_renderer import FrameRenderer
 from internal.core.camera_manager import CameraManager
 from internal.core.sexual_harassment_detector import SexualHarassmentDetector
 from internal.api.routes import create_router
@@ -30,15 +31,18 @@ def create_app():
     config = load_config("configs/config.yml")
 
     # Initialize face recognition
-    sexual_harassment_detector = SexualHarassmentDetector(config)
+    sexual_harassment_detector = SexualHarassmentDetector(config.detection_settings)
 
     # Initialize services
-    mqtt_service = MQTTService(config)
+    mqtt_service = MQTTService(config.mqtt)
+    frame_renderer = FrameRenderer()
 
     # Initialize Camera Manager (which manages FaceRecognition)
     camera_manager = CameraManager(
-        config,
+        cam_configs=config.cameras,
+        snapshot_config=config.snapshot,
         sexual_harassment_detector=sexual_harassment_detector,
+        frame_renderer=frame_renderer,
         mqtt_service=mqtt_service,
     )
 
@@ -72,7 +76,7 @@ def create_app():
     )
 
     # Include API routes
-    api_router = create_router(camera_manager, config)
+    api_router = create_router(camera_manager, config, sexual_harassment_detector, frame_renderer)
     app.include_router(api_router, prefix="/api")
 
     @app.get("/health", tags=["System"])

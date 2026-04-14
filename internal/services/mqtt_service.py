@@ -1,3 +1,4 @@
+from internal.utils.config_loader import MQTTConfig
 import json
 import os
 import logging
@@ -12,12 +13,12 @@ logger = logging.getLogger("MQTT")
 class MQTTService:
     """Centralized MQTT Service for publishing events, states, and handling commands"""
 
-    def __init__(self, config: Config):
-        self.config = config.mqtt
-        self.enabled = self.config.enabled
-        self.event_topic = self.config.event_topic_prefix
-        self.cmd_prefix = self.config.command_topic_prefix
-        self.state_prefix = self.config.state_topic_prefix
+    def __init__(self, mqtt_config: MQTTConfig):
+        self.mqtt_config = mqtt_config
+        self.enabled = mqtt_config.enabled
+        self.event_topic = mqtt_config.event_topic_prefix
+        self.cmd_prefix = mqtt_config.command_topic_prefix
+        self.state_prefix = mqtt_config.state_topic_prefix
 
         self.client = None
         self.command_callbacks = {}  # cam_name -> callback function
@@ -98,7 +99,6 @@ class MQTTService:
 
         topic = f"{self.event_topic}/{cam_name}"
         self.client.publish(topic, json.dumps(payload), qos=1)
-        logger.debug(f"[MQTT] Event: {cam_name} {payload['confidence']}")
 
     def publish_state(self, cam_name, is_running):
         """Publish camera running state"""

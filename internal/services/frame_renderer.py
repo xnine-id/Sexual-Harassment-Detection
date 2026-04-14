@@ -16,12 +16,14 @@ class FrameRenderer:
         prob_text = f"{detections['label']} ({detections['score']:.2f})"
         color = (0, 0, 255) if detections["class"] == 1 else (0, 255, 0)
 
+        font_scale = 1
+
         cv2.putText(
             frame,
             prob_text,
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
-            1,
+            font_scale,
             color,
             2,
         )

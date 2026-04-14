@@ -1,3 +1,4 @@
+from internal.utils.config_loader import SnapshotConfig
 import threading
 import logging
 import asyncio
@@ -5,7 +6,8 @@ from typing import Dict, List, Optional
 from internal.core.camera_processor import CameraProcessor
 from internal.core.sexual_harassment_detector import SexualHarassmentDetector
 from internal.services.mqtt_service import MQTTService
-from internal.utils.config_loader import Config
+from internal.services.frame_renderer import FrameRenderer
+from internal.utils.config_loader import CameraConfig
 
 logger = logging.getLogger("CAMERA_MANAGER")
 
@@ -15,28 +17,33 @@ class CameraManager:
 
     def __init__(
         self,
-        config: Config,
+        cam_configs: List[CameraConfig],
+        snapshot_config: SnapshotConfig,
         sexual_harassment_detector: SexualHarassmentDetector,
+        frame_renderer: FrameRenderer,
         mqtt_service: Optional[MQTTService] = None,
     ):
-        self.config = config
+        self.cam_configs = cam_configs
+        self.snapshot_config = snapshot_config
         self.sexual_harassment_detector = sexual_harassment_detector
         self.stop_event = threading.Event()
         self.threads: List[threading.Thread] = []
         self.camera_processors: Dict[str, CameraProcessor] = {}
 
-        # Setup MQTT Service
+        # Setup Services
         self.mqtt_service = mqtt_service
+        self.frame_renderer = frame_renderer
 
     def _create_camera_processors(self):
         """Create processor instances for each enabled camera"""
 
-        for cam_config in self.config.cameras:
+        for cam_config in self.cam_configs:
             processor = CameraProcessor(
                 cam_config=cam_config,
-                snapshot_config=self.config.snapshot,
-                mqtt_service=self.mqtt_service,
+                snapshot_config=self.snapshot_config,
                 sexual_harassment_detector=self.sexual_harassment_detector,
+                frame_renderer=self.frame_renderer,
+                mqtt_service=self.mqtt_service,
                 stop_event=self.stop_event,
             )
             self.camera_processors[processor.cam_name] = processor

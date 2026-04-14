@@ -14,6 +14,8 @@ from internal.utils.config_loader import SnapshotConfig
 
 logger = logging.getLogger("SEXUAL_HARASSMENT_TRACKER")
 
+HARASSMENT_TIME_THRESHOLD = 10  # seconds
+
 
 class SexualHarassmentTracker(SexualHarassmentTrackerInt):
     def __init__(
@@ -24,56 +26,51 @@ class SexualHarassmentTracker(SexualHarassmentTrackerInt):
         self.cam_name = cam_name
         self.mqtt_service = mqtt_service
 
-        self.threshold = 5
-
-        self.current_score: Optional[int] = None
-        self.update_count = 0
         self.event_id: Optional[str] = None
+        self.last_harassment_time: Optional[datetime] = None
 
     def update(self, frame: MatLike, result: Dict[str, Any]):
         """Update detection"""
-        if result and result["class"] == 1:
-            self.update_count = 0
-            prev_score = self.current_score
-            self.current_score = result["score"]
+        now = datetime.now()
+        is_new_event = (
+            self.last_harassment_time is None
+            or self.event_id is None
+            or (now - self.last_harassment_time).seconds > HARASSMENT_TIME_THRESHOLD
+        )
 
-            snapshot = None
-            if prev_score == None or self.event_id == None:
-                self.event_id = str(uuid.uuid4())
-                if self.snapshot_enabled and frame is not None:
-                    snapshot = self._save_snapshot(frame)
+        if result:
+            if result["class"] == 1:
+                snapshot = None
+                self.last_harassment_time = now
 
-            if self.mqtt_service and self.current_score != prev_score:
-                self.mqtt_service.publish_event(
-                    event_id=self.event_id,
-                    cam_name=self.cam_name,
-                    confidence=result["score"] * 100,
-                    snapshot=snapshot,
-                )
-
-        else:
-            self.update_count += 1
-            if self.update_count % self.threshold == 0:
-                prev_score = self.current_score
-                self.current_score = None
-
-                if prev_score != None:
+                if is_new_event:
                     self.event_id = str(uuid.uuid4())
+                    if self.snapshot_enabled and frame is not None:
+                        snapshot = self._save_snapshot(frame)
+
+                if self.mqtt_service:
                     self.mqtt_service.publish_event(
                         event_id=self.event_id,
                         cam_name=self.cam_name,
                         confidence=result["score"] * 100,
-                        event_type="no_harassment",
+                        snapshot=snapshot,
                     )
 
-    def reset(self):
-        self.current_score = None
-        self.event_id = None
-        self.update_count = 0
+            else:
+                if is_new_event:
+                    self.event_id = str(uuid.uuid4())
 
-    def get_current_detection(self):
-        """Get current detection for rendering"""
-        return self.current_detection
+                    if self.mqtt_service:
+                        self.mqtt_service.publish_event(
+                            event_id=self.event_id,
+                            cam_name=self.cam_name,
+                            confidence=result["score"] * 100,
+                            event_type="no_harassment",
+                        )
+
+    def reset(self):
+        self.event_id = None
+        self.last_harassment_time = None
 
     def _save_snapshot(self, frame: MatLike):
         today = datetime.now().strftime("%Y-%m-%d")
@@ -92,7 +89,7 @@ class SexualHarassmentTracker(SexualHarassmentTrackerInt):
                 )
                 cv2.imwrite(final_output, frame)
             except Exception as e:
-                logger.Info(f"[{self.cam_name}] Failed to save snapshot: {e}")
+                logger.info(f"[{self.cam_name}] Failed to save snapshot: {e}")
 
         # Run in background
         threading.Thread(target=save_task, daemon=True).start()

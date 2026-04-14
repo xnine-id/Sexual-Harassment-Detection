@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 class DetectionSettings:
     model_path: str
     output_dir: str
+    detect_fps: int = 5
     resize: List[int] = field(default_factory=lambda: [224, 224])
 
 
@@ -17,7 +18,6 @@ class CameraConfig:
     url: str
     enabled: bool
     detect_fps: int = 5
-    show_frame: bool = False
 
 
 @dataclass
@@ -61,7 +61,7 @@ def validate_config(config: Dict[str, Any], required_keys: Dict[str, Any]) -> No
 
 
 REQUIRED_CONFIG = {
-    "detection_settings": {"model_path": str, "output_dir": str, "resize": List[int]},
+    "detection_settings": {"model_path": str, "output_dir": str, "detect_fps": int, "resize": List[int]},
     "cameras": [{"name": str, "url": str, "enabled": bool}],
     "snapshot": {"enabled": bool, "output_dir": str},
     "mqtt": {

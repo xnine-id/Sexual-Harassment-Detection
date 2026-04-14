@@ -2,6 +2,7 @@ detection_settings:
   model_path: "/app/storage/private/models/weight.hdf5"
   output_dir: '/app/storage/private/output'
   resize: [224, 224]
+  detect_fps: 5
 
 cameras:
   - name: "webcam1"
