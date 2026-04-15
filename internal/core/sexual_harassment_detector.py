@@ -31,6 +31,7 @@ class SexualHarassmentDetector:
 
     def load_model(self):
         if not os.path.exists(self.detection_settings.model_path):
+            os.makedirs(os.path.dirname(self.detection_settings.model_path), exist_ok=True)
             download_model(os.getenv('MODEL_GDRIVE_ID'), self.detection_settings.model_path)
 
         return load_model(self.detection_settings.model_path)
