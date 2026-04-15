@@ -7,3 +7,4 @@ paho-mqtt
 pyyaml
 python-dotenv
 python-multipart
+gdown

@@ -3,11 +3,12 @@ import cv2
 from cv2.typing import MatLike
 import numpy as np
 import logging
+import os
 from typing import Dict, Any
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
-from internal.utils.config_loader import Config
+from internal.utils.model_downloader import download_model
 
 logger = logging.getLogger("SEXUAL_DETECTION")
 
@@ -16,7 +17,7 @@ class SexualHarassmentDetector:
     def __init__(self, detection_settings: DetectionSettings):
         self.detection_settings = detection_settings
         self.base_model = VGG16(weights="imagenet", include_top=False)
-        self.model = load_model(self.detection_settings.model_path)
+        self.model = self.load_model()
 
         # Resize cache per instance (if needed, or move to a per-camera state)
         # Since the detector might be shared, it's better if preprocessing is pure
@@ -27,6 +28,12 @@ class SexualHarassmentDetector:
             "offsets": None,
             "canvas": None,
         }
+
+    def load_model(self):
+        if not os.path.exists(self.detection_settings.model_path):
+            download_model(os.getenv('MODEL_GDRIVE_ID'), self.detection_settings.model_path)
+
+        return load_model(self.detection_settings.model_path)
 
     def preprocessing(self, frame: MatLike) -> MatLike:
         """Resize image to target dimensions while maintaining aspect ratio and padding with black"""
