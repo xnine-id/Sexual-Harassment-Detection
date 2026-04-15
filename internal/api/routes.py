@@ -1,3 +1,4 @@
+import mimetypes
 import logging
 import os
 import shutil
@@ -123,7 +124,7 @@ def create_router(
             await run_in_threadpool(process_video_sync, temp_input, output_path)
 
             # 4. Generate URL
-            video_url = f"/api/videos/{output_filename}"
+            video_url = f"/api/result/{output_filename}"
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
@@ -163,7 +164,7 @@ def create_router(
             result = await run_in_threadpool(process_image_sync, temp_input, output_path)
 
             # 4. Generate URL
-            image_url = f"/api/images/{output_filename}"
+            image_url = f"/api/result/{output_filename}"
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
@@ -177,10 +178,10 @@ def create_router(
             if _os.path.exists(temp_input):
                 _os.remove(temp_input)
 
-    @router.get("/videos/{filename}", summary="Get result video file", tags=["Prediction"])
-    async def get_video(filename: str):
+    @router.get("/result/{filename}", summary="Get result file", tags=["Prediction"])
+    async def get_result(filename: str):
         """
-        Serve result video file.
+        Serve result file.
         """
         if not output_dir:
             raise HTTPException(status_code=500, detail="Output directory not configured")
@@ -194,30 +195,6 @@ def create_router(
         if not os.path.exists(requested_path):
             raise HTTPException(status_code=404, detail="Video not found")
 
-        return FileResponse(requested_path, media_type="video/mp4", filename=filename)
-
-    @router.get("/images/{filename}", summary="Get result image file", tags=["Prediction"])
-    async def get_image(filename: str):
-        """
-        Serve result image file.
-        """
-        if not output_dir:
-            raise HTTPException(status_code=500, detail="Output directory not configured")
-
-        base_dir = os.path.abspath(output_dir)
-        requested_path = os.path.abspath(os.path.join(base_dir, filename))
-
-        if not requested_path.startswith(base_dir):
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        if not os.path.exists(requested_path):
-            raise HTTPException(status_code=404, detail="Image not found")
-
-        import mimetypes
         mime_type, _ = mimetypes.guess_type(requested_path)
-        if not mime_type:
-            mime_type = "image/jpeg"
 
         return FileResponse(requested_path, media_type=mime_type, filename=filename)
-
-    return router
