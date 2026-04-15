@@ -57,7 +57,7 @@ def create_app():
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error(f"Unknown error in lifespan: {e}")
+            logger.exception(f"Unknown error in lifespan: {e}")
         finally:
             camera_manager.stop()
             if mqtt_service:
@@ -95,5 +95,5 @@ if __name__ == "__main__":
             app, host=host, port=port, log_level=os.getenv("UVICORN_LOG_LEVEL", "info")
         )
     except Exception as e:
-        logger.error(f"Failed to start API: {e}")
+        logger.exception(f"Failed to start API: {e}")
         sys.exit(1)

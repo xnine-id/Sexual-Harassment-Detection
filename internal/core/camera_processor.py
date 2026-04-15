@@ -249,14 +249,14 @@ class CameraProcessor:
                             )
                         except Exception as e:
                             if not self.stop_event.is_set():
-                                logger.error(f"[{self.cam_name}] Detection error: {e}")
+                                logger.exception(f"[{self.cam_name}] Detection error: {e}")
                             result = None
 
                         with self.detections_lock:
                             self.current_detection = result
 
             except Exception as e:
-                logger.error(f"[{self.cam_name}] Error in detection loop: {e}")
+                logger.exception(f"[{self.cam_name}] Error in detection loop: {e}")
 
     def _process_frame(self, frame: MatLike):
         """Main frame processing pipeline: Resize -> Detect -> Render -> Track -> Save"""

@@ -45,7 +45,7 @@ class MQTTService:
             self.client.loop_start()
             logger.info(f"[MQTT] Connected to {host}:{port}")
         except Exception as e:
-            logger.error(f"[MQTT] Connection failed: {e}")
+            logger.exception(f"[MQTT] Connection failed: {e}")
             self.client = None
 
     def _on_connect(self, client, userdata, flags, rc):
@@ -66,7 +66,7 @@ class MQTTService:
                 if cam_name in self.command_callbacks:
                     self.command_callbacks[cam_name](payload)
         except Exception as e:
-            logger.error(f"[MQTT] Error handling message on {msg.topic}: {e}")
+            logger.exception(f"[MQTT] Error handling message on {msg.topic}: {e}")
 
     def register_camera(self, cam_name, state, on_command_callback):
         """Register a camera for commands and initial state"""

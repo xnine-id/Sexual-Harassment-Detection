@@ -131,7 +131,7 @@ def create_router(
                 content={"data": {"filename": output_filename, "url": video_url}},
             )
         except Exception as e:
-            logger.error(f"Error processing video: {e}")
+            logger.exception(f"Error processing video: {e}")
             raise HTTPException(status_code=500, detail=str(e))
         finally:
             # Cleanup temp file
@@ -171,7 +171,7 @@ def create_router(
                 content={"data": {"filename": output_filename, "url": image_url, "prediction": result}},
             )
         except Exception as e:
-            logger.error(f"Error processing image: {e}")
+            logger.exception(f"Error processing image: {e}")
             raise HTTPException(status_code=500, detail=str(e))
         finally:
             # Cleanup temp file
@@ -198,3 +198,5 @@ def create_router(
         mime_type, _ = mimetypes.guess_type(requested_path)
 
         return FileResponse(requested_path, media_type=mime_type, filename=filename)
+
+    return router

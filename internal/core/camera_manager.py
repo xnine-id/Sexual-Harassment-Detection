@@ -55,7 +55,7 @@ class CameraManager:
         """Async generator for streaming frames from a specific camera"""
         processor = self._get_processor(camera_name)
         if not processor:
-            logger.error(f"Processor for camera '{camera_name}' not found")
+            logger.exception(f"Processor for camera '{camera_name}' not found")
             return
 
         while not self.stop_event.is_set():
@@ -99,7 +99,7 @@ class CameraManager:
             logger.info("Ctrl+C detected. Stopping...")
             self.stop()
         except Exception as e:
-            logger.error(f"Unexpected error starting cameras: {e}")
+            logger.exception(f"Unexpected error starting cameras: {e}")
             self.stop()
             if not blocking:
                 raise e
