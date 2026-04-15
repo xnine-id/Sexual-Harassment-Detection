@@ -7,3 +7,7 @@ class SexualHarassmentTrackerInt(ABC):
     @abstractmethod
     def update(self, frame: MatLike, result: Dict[str, Any]):
         pass
+
+    @abstractmethod
+    def reset(self):
+        pass

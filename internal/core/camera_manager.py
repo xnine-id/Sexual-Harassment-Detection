@@ -1,3 +1,4 @@
+from internal.services.sexual_harassment_tracker import SexualHarassmentTracker
 from internal.utils.config_loader import SnapshotConfig
 import threading
 import logging
@@ -38,11 +39,17 @@ class CameraManager:
         """Create processor instances for each enabled camera"""
 
         for cam_config in self.cam_configs:
+            tracker = SexualHarassmentTracker(
+                snapshot_config=self.snapshot_config,
+                cam_name=cam_config.name,
+                mqtt_service=self.mqtt_service,
+            )
+
             processor = CameraProcessor(
                 cam_config=cam_config,
-                snapshot_config=self.snapshot_config,
                 sexual_harassment_detector=self.sexual_harassment_detector,
                 frame_renderer=self.frame_renderer,
+                tracker=tracker,
                 mqtt_service=self.mqtt_service,
                 stop_event=self.stop_event,
             )

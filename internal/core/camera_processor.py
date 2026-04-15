@@ -1,3 +1,4 @@
+from internal.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
 import cv2
 from cv2.typing import MatLike
 import threading
@@ -22,9 +23,9 @@ class CameraProcessor:
     def __init__(
         self,
         cam_config: CameraConfig,
-        snapshot_config: SnapshotConfig,
         sexual_harassment_detector: SexualHarassmentDetector,
         frame_renderer: FrameRenderer,
+        tracker: SexualHarassmentTrackerInt,
         mqtt_service: Optional[MQTTService] = None,
         stop_event: Optional[Event] = None,
         output_path: Optional[str] = None,
@@ -68,11 +69,7 @@ class CameraProcessor:
         # 4. Services
         self.mqtt_service: Optional[MQTTService] = mqtt_service
         self.frame_renderer = frame_renderer
-        self.sexual_harassment_tracker = SexualHarassmentTracker(
-            snapshot_config=snapshot_config,
-            cam_name=self.cam_name,
-            mqtt_service=self.mqtt_service,
-        )
+        self.tracker = tracker
 
         # Register for MQTT commands
         if self.mqtt_service:
@@ -87,9 +84,9 @@ class CameraProcessor:
             self.is_running = run_status
             if self.mqtt_service:
                 self.mqtt_service.publish_state(self.cam_name, self.is_running)
-            status_str = "ENABLED" if run_status else "DISABLED"
-            if not self.is_running:
-                self.sexual_harassment_tracker.reset()
+                status_str = "ENABLED" if run_status else "DISABLED"
+                if not self.is_running:
+                    self.tracker.reset()
             logger.info(f"[{self.cam_name}] Status changed to {status_str} via MQTT")
 
     def _initialize_capture(self):
@@ -276,7 +273,7 @@ class CameraProcessor:
             frame_display = self.frame_renderer.render(frame, result)
 
         # 4. Update tracker
-        self.sexual_harassment_tracker.update(frame_display, result)
+        self.tracker.update(frame_display, result)
 
         # 5. Save for lazy encoding
         with self.render_lock:
