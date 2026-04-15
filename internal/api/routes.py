@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 import uuid
-from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, HTTPException, UploadFile, File, status, BackgroundTasks
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from internal.core.camera_manager import CameraManager
 from internal.core.camera_processor import CameraProcessor
@@ -22,6 +22,8 @@ def create_router(
     renderer: FrameRenderer,
 ):
     router = APIRouter()
+    
+    jobs = {}
 
     snapshot_dir = config.snapshot.output_dir
     output_dir = config.detection_settings.output_dir
@@ -100,10 +102,39 @@ def create_router(
             processor.stop_event.set()
             raise e
 
+    async def bg_process_video(job_id: str, temp_input: str, output_path: str, output_filename: str):
+        jobs[job_id] = {"status": "processing"}
+        try:
+            await run_in_threadpool(process_video_sync, temp_input, output_path)
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["result"] = {"filename": output_filename, "url": f"/api/result/{output_filename}"}
+        except Exception as e:
+            logger.exception(f"Error processing video job {job_id}: {e}")
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+        finally:
+            if os.path.exists(temp_input):
+                os.remove(temp_input)
+
+    async def bg_process_image(job_id: str, temp_input: str, output_path: str, output_filename: str):
+        jobs[job_id] = {"status": "processing"}
+        try:
+            result = await run_in_threadpool(process_image_sync, temp_input, output_path)
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["result"] = {"filename": output_filename, "url": f"/api/result/{output_filename}", "prediction": result}
+        except Exception as e:
+            logger.exception(f"Error processing image job {job_id}: {e}")
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+        finally:
+            import os as _os
+            if _os.path.exists(temp_input):
+                _os.remove(temp_input)
+
     @router.post("/predict/video", summary="Predict sexual harassment from uploaded video", tags=["Prediction"])
-    async def predict_video(file: UploadFile = File(...)):
+    async def predict_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
-        Upload a video, process it for sexual harassment detection, and return the result URL.
+        Upload a video, start background job for sexual harassment detection, and return job id.
         """
         if not output_dir or not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
@@ -119,29 +150,20 @@ def create_router(
             output_filename += ".mp4"
         output_path = os.path.join(output_dir, output_filename)
 
-        try:
-            # 3. Process video in thread pool
-            await run_in_threadpool(process_video_sync, temp_input, output_path)
+        job_id = str(uuid.uuid4())
+        jobs[job_id] = {"status": "pending"}
 
-            # 4. Generate URL
-            video_url = f"/api/result/{output_filename}"
+        background_tasks.add_task(bg_process_video, job_id, temp_input, output_path, output_filename)
 
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={"data": {"filename": output_filename, "url": video_url}},
-            )
-        except Exception as e:
-            logger.exception(f"Error processing video: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-        finally:
-            # Cleanup temp file
-            if os.path.exists(temp_input):
-                os.remove(temp_input)
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"message": "Job created", "job_id": job_id},
+        )
 
     @router.post("/predict/image", summary="Predict sexual harassment from uploaded image", tags=["Prediction"])
-    async def predict_image(file: UploadFile = File(...)):
+    async def predict_image(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
-        Upload an image, process it for sexual harassment detection, and return the result URL.
+        Upload an image, start background job for sexual harassment detection, and return job id.
         """
         if not output_dir or not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
@@ -159,24 +181,28 @@ def create_router(
         output_filename = f"processed_{uuid.uuid4()}{ext}"
         output_path = _os.path.join(output_dir, output_filename)
 
-        try:
-            # 3. Process image in thread pool
-            result = await run_in_threadpool(process_image_sync, temp_input, output_path)
+        job_id = str(uuid.uuid4())
+        jobs[job_id] = {"status": "pending"}
 
-            # 4. Generate URL
-            image_url = f"/api/result/{output_filename}"
+        background_tasks.add_task(bg_process_image, job_id, temp_input, output_path, output_filename)
 
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={"data": {"filename": output_filename, "url": image_url, "prediction": result}},
-            )
-        except Exception as e:
-            logger.exception(f"Error processing image: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-        finally:
-            # Cleanup temp file
-            if _os.path.exists(temp_input):
-                _os.remove(temp_input)
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"message": "Job created", "job_id": job_id},
+        )
+
+    @router.get("/jobs/{job_id}", summary="Get job status", tags=["Prediction"])
+    async def get_job_status(job_id: str):
+        """
+        Get the status of a background prediction job.
+        """
+        if job_id not in jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"job_id": job_id, **jobs[job_id]}
+        )
 
     @router.get("/result/{filename}", summary="Get result file", tags=["Prediction"])
     async def get_result(filename: str):
@@ -193,7 +219,7 @@ def create_router(
             raise HTTPException(status_code=403, detail="Access denied")
 
         if not os.path.exists(requested_path):
-            raise HTTPException(status_code=404, detail="Video not found")
+            raise HTTPException(status_code=404, detail="File not found")
 
         mime_type, _ = mimetypes.guess_type(requested_path)
 
