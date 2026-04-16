@@ -9,6 +9,8 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
 from internal.utils.model_downloader import download_model
+import tensorflow as tf
+
 
 logger = logging.getLogger("SEXUAL_DETECTION")
 
@@ -16,6 +18,14 @@ logger = logging.getLogger("SEXUAL_DETECTION")
 class SexualHarassmentDetector:
     def __init__(self, detection_settings: DetectionSettings):
         self.detection_settings = detection_settings
+        
+        # Check for GPU availability and log
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            logger.info(f"SexualHarassmentDetector (Tensorflow) is using GPU: {gpus}")
+        else:
+            logger.info("SexualHarassmentDetector (Tensorflow) is using CPU")
+
         self.base_model = VGG16(weights="imagenet", include_top=False)
         self.model = self.load_model()
 
