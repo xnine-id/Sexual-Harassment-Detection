@@ -23,6 +23,8 @@ class SexualHarassmentDetector:
         gpus = tf.config.list_physical_devices('GPU')
         if gpus:
             logger.info(f"SexualHarassmentDetector (Tensorflow) is using GPU: {gpus}")
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
         else:
             logger.info("SexualHarassmentDetector (Tensorflow) is using CPU")
 
