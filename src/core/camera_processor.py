@@ -11,34 +11,34 @@ from threading import Event, Lock
 from src.services.frame_renderer import FrameRenderer
 from src.services.mqtt_service import MQTTService
 from src.core.sexual_harassment_detector import SexualHarassmentDetector
-from src.services.sexual_harassment_tracker import SexualHarassmentTracker
-from src.utils.config_loader import CameraConfig, SnapshotConfig
+from src.database.entity.camera import Camera
 
 logger = logging.getLogger("CAM_PROCESSOR")
 
+
+MAX_READ_FAILURES = 10
 
 class CameraProcessor:
     """Process single camera stream with sexual harassment detection"""
 
     def __init__(
         self,
-        cam_config: CameraConfig,
+        cam_config: Camera,
         sexual_harassment_detector: SexualHarassmentDetector,
         frame_renderer: FrameRenderer,
         tracker: SexualHarassmentTrackerInt,
         mqtt_service: Optional[MQTTService] = None,
-        stop_event: Optional[Event] = None,
         output_path: Optional[str] = None,
     ):
         # Configuration
         self.cam_name = cam_config.name
         self.url = cam_config.url
         self.detect_fps = cam_config.detect_fps
-        self.is_running = cam_config.enabled
+        self.is_running = cam_config.is_enabled
         self.width = 0
         self.height = 0
 
-        self.stop_event = stop_event or Event()
+        self.stop_event = Event()
         self.is_live_stream = False
         self.output_path = output_path
         self.out: Optional[cv2.VideoWriter] = None
@@ -182,7 +182,7 @@ class CameraProcessor:
                 with self.capture_lock:
                     self.capture_ret = False
 
-                if not_ret_count > 10:
+                if not_ret_count > MAX_READ_FAILURES:
                     not_ret_count = 0
                     logger.warning(f"[{self.cam_name}] Stream broken, resetting...")
                     if self.cap is not None:
@@ -342,3 +342,6 @@ class CameraProcessor:
             pass
 
         logger.info(f"[{self.cam_name}] Processor stopped")
+
+    def stop(self):
+        self.stop_event.set()

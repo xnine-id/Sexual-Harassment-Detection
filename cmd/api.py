@@ -40,7 +40,6 @@ def create_app():
 
     # Initialize Camera Manager (which manages FaceRecognition)
     camera_manager = CameraManager(
-        cam_configs=config.cameras,
         snapshot_config=config.snapshot,
         sexual_harassment_detector=sexual_harassment_detector,
         frame_renderer=frame_renderer,
@@ -53,7 +52,7 @@ def create_app():
         try:
             # Startup
             await init_db()
-            camera_manager.start(blocking=False)
+            await camera_manager.start(blocking=False)
 
             yield
         except asyncio.CancelledError:

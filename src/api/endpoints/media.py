@@ -1,3 +1,5 @@
+from src.core.camera_manager import CameraManager
+from fastapi.responses import StreamingResponse
 from fastapi import Depends
 from src.api.middleware.auth import verify_token
 from src.utils.config_loader import Config
@@ -5,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 import os
 
-def get_media_router(config: Config):
+def get_media_router(config: Config, camera_manager: CameraManager):
     router = APIRouter(tags=["Media"])
 
     # Get snapshot directory from config
@@ -36,5 +38,15 @@ def get_media_router(config: Config):
             raise HTTPException(status_code=404, detail="Snapshot not found")
 
         return FileResponse(requested_path, filename=filename)
+
+    @router.get("/video_feed/{camera_name}")
+    async def video_feed(camera_name: str):
+        """
+        Get video feed from a specific camera.
+        """
+        return StreamingResponse(
+            camera_manager.stream_generator(camera_name),
+            media_type="multipart/x-mixed-replace; boundary=frame",
+        )
 
     return router

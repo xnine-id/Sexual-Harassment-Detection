@@ -4,12 +4,6 @@ detection_settings:
   detect_fps: 5
   resize: [224, 224]
 
-cameras:
-  - name: "webcam1"
-    url: "rtsp://localhost:8554/input/webcam1"
-    enabled: true
-    detect_fps: 5
-
 snapshot:
   enabled: true
   output_dir: '/home/ams/app/skyure/Sexual-Harassment-Detection-In-Workplace/storage/private/snapshots'

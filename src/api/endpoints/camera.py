@@ -8,11 +8,11 @@ from src.api.schemas import AddCameraRequest, UpdateCameraRequest, CameraRespons
 from typing import List
 
 
-async def get_camera_service(db: AsyncSession = Depends(get_db)):
-    return CameraService(db)
-
 def get_camera_router(camera_manager: CameraManager):
     router = APIRouter(prefix="/cameras", tags=["Camera"], dependencies=[Depends(verify_token)])
+
+    async def get_camera_service(db: AsyncSession = Depends(get_db)):
+        return CameraService(db, camera_manager)
 
     @router.get("", response_model=List[CameraResponse])
     async def list_cameras(service: CameraService = Depends(get_camera_service)):

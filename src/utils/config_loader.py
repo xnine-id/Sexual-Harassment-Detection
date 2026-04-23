@@ -13,14 +13,6 @@ class DetectionSettings:
 
 
 @dataclass
-class CameraConfig:
-    name: str
-    url: str
-    enabled: bool
-    detect_fps: int = 5
-
-
-@dataclass
 class SnapshotConfig:
     enabled: bool
     output_dir: str
@@ -37,7 +29,6 @@ class MQTTConfig:
 @dataclass
 class Config:
     detection_settings: DetectionSettings
-    cameras: List[CameraConfig]
     snapshot: SnapshotConfig
     mqtt: MQTTConfig
 
@@ -62,7 +53,6 @@ def validate_config(config: Dict[str, Any], required_keys: Dict[str, Any]) -> No
 
 REQUIRED_CONFIG = {
     "detection_settings": {"model_path": str, "output_dir": str, "detect_fps": int, "resize": List[int]},
-    "cameras": [{"name": str, "url": str, "enabled": bool}],
     "snapshot": {"enabled": bool, "output_dir": str},
     "mqtt": {
         "enabled": bool,
@@ -81,7 +71,6 @@ def load_config(config_file: str) -> Config:
 
     return Config(
         detection_settings=DetectionSettings(**config_dict["detection_settings"]),
-        cameras=[CameraConfig(**c) for c in config_dict["cameras"]],
         snapshot=SnapshotConfig(**config_dict["snapshot"]),
         mqtt=MQTTConfig(**config_dict["mqtt"]),
     )

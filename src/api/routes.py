@@ -22,7 +22,7 @@ def create_router(
     router.include_router(get_camera_router(camera_manager))
 
     # Include Media endpoints (Snapshots)
-    router.include_router(get_media_router(config))
+    router.include_router(get_media_router(config, camera_manager))
 
     # Include System endpoints (Health & Tokens)
     router.include_router(get_system_router())

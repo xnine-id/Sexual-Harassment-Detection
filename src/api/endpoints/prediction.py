@@ -11,8 +11,9 @@ from fastapi.responses import FileResponse
 from src.core.camera_processor import CameraProcessor
 from src.core.sexual_harassment_detector import SexualHarassmentDetector
 from src.services.frame_renderer import FrameRenderer
-from src.utils.config_loader import Config, CameraConfig
+from src.utils.config_loader import Config
 from src.api.schemas import JobCreateResponse, JobStatusResponse
+from src.database.entity.camera import Camera
 from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger("API_PREDICTION")
@@ -50,11 +51,11 @@ def get_prediction_router(
 
     def process_video_sync(input_path: str, output_path: str):
         """Process video file using the CameraProcessor engine"""
-        cam_config = CameraConfig(
+        cam_config = Camera(
             name="video_upload",
             url=input_path,
             detect_fps=config.detection_settings.detect_fps,
-            enabled=True,
+            is_enabled=True,
         )
         tracker = VideoSexualHarassmentTracker()
 

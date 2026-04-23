@@ -4,12 +4,6 @@ detection_settings:
   resize: [224, 224]
   detect_fps: 5
 
-cameras:
-  - name: "webcam1"
-    url: "rtsp://mediamtx:8554/input/webcam1"
-    enabled: true
-    detect_fps: 5
-
 snapshot:
   enabled: true
   output_dir: '/app/storage/private/snapshots'

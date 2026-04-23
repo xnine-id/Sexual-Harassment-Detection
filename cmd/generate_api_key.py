@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import asyncio
 import os
 import sys
@@ -21,8 +24,8 @@ async def generate_admin_token(name: str):
     session_factory = get_sessionmaker()
     async with session_factory() as session:
         # Generate token random
-        token_str = secrets.token_hex(16)
-        
+        token_str = os.getenv("ADMIN_API_KEY") or secrets.token_hex(16)
+
         # Buat entity token baru sebagai admin
         new_token = Token(
             name=name,

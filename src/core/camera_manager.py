@@ -8,7 +8,7 @@ from src.core.camera_processor import CameraProcessor
 from src.core.sexual_harassment_detector import SexualHarassmentDetector
 from src.services.mqtt_service import MQTTService
 from src.services.frame_renderer import FrameRenderer
-from src.utils.config_loader import CameraConfig
+from src.database.entity.camera import Camera
 
 logger = logging.getLogger("CAMERA_MANAGER")
 
@@ -18,13 +18,11 @@ class CameraManager:
 
     def __init__(
         self,
-        cam_configs: List[CameraConfig],
         snapshot_config: SnapshotConfig,
         sexual_harassment_detector: SexualHarassmentDetector,
         frame_renderer: FrameRenderer,
         mqtt_service: Optional[MQTTService] = None,
     ):
-        self.cam_configs = cam_configs
         self.snapshot_config = snapshot_config
         self.sexual_harassment_detector = sexual_harassment_detector
         self.stop_event = threading.Event()
@@ -35,25 +33,73 @@ class CameraManager:
         self.mqtt_service = mqtt_service
         self.frame_renderer = frame_renderer
 
-    def _create_camera_processors(self):
-        """Create processor instances for each enabled camera"""
+    async def _create_camera_processors(self):
+        """
+        Creates processor instances for each enabled camera defined in the database.
+        """
+        from src.database.session import get_sessionmaker
+        from sqlalchemy.future import select
 
-        for cam_config in self.cam_configs:
-            tracker = SexualHarassmentTracker(
-                snapshot_config=self.snapshot_config,
-                cam_name=cam_config.name,
-                mqtt_service=self.mqtt_service,
-            )
+        session_factory = get_sessionmaker()
+        async with session_factory() as session:
+            result = await session.execute(select(Camera))
+            cameras = result.scalars().all()
 
-            processor = CameraProcessor(
-                cam_config=cam_config,
-                sexual_harassment_detector=self.sexual_harassment_detector,
-                frame_renderer=self.frame_renderer,
-                tracker=tracker,
-                mqtt_service=self.mqtt_service,
-                stop_event=self.stop_event,
-            )
-            self.camera_processors[processor.cam_name] = processor
+            for camera in cameras:
+                self.add_camera_processor(camera)
+
+    def add_camera_processor(self, camera: Camera):
+        """Adds and starts a new camera processor."""
+        if camera.name in self.camera_processors:
+            logger.warning(f"Processor for camera '{camera.name}' already exists. Skipping.")
+            return
+
+        tracker = SexualHarassmentTracker(
+            snapshot_config=self.snapshot_config,
+            cam_name=camera.name,
+            mqtt_service=self.mqtt_service,
+        )
+
+        processor = CameraProcessor(
+            cam_config=camera,
+            sexual_harassment_detector=self.sexual_harassment_detector,
+            frame_renderer=self.frame_renderer,
+            tracker=tracker,
+            mqtt_service=self.mqtt_service,
+        )
+        self.camera_processors[camera.name] = processor
+        
+        # If manager is already running, start the processor thread
+        if not self.stop_event.is_set():
+            self._start_processor_thread(processor)
+
+    def update_camera_processor(self, camera: Camera):
+        """Updates an existing camera processor by restarting it with new config."""
+        self.remove_camera_processor(camera.name)
+        self.add_camera_processor(camera)
+
+    def remove_camera_processor(self, camera_name: str):
+        """Stops and removes a camera processor."""
+        processor = self.camera_processors.pop(camera_name, None)
+        if processor:
+            processor.stop()
+            # Find and join thread (optional, but good for cleanup)
+            for i, thread in enumerate(self.threads):
+                if thread.name == f"Thread-{camera_name}":
+                    if thread.is_alive():
+                        thread.join(timeout=2.0)
+                    self.threads.pop(i)
+                    break
+            logger.info(f"Camera processor '{camera_name}' stopped and removed")
+
+    def _start_processor_thread(self, processor: CameraProcessor):
+        thread = threading.Thread(
+            target=processor.run, name=f"Thread-{processor.cam_name}"
+        )
+        thread.daemon = True
+        thread.start()
+        self.threads.append(thread)
+        logger.info(f"Camera processor '{processor.cam_name}' started")
 
     def _get_processor(self, name: str) -> Optional[CameraProcessor]:
         return self.camera_processors.get(name)
@@ -75,7 +121,7 @@ class CameraManager:
             # Limit to ~25fps to avoid excessive CPU/bandwidth usage
             await asyncio.sleep(0.04)
 
-    def start(self, blocking: bool = True):
+    async def start(self, blocking: bool = True):
         """Start all camera processors"""
         logger.info("Starting Camera Manager...")
 
@@ -83,19 +129,10 @@ class CameraManager:
         self.stop_event.clear()
 
         try:
-            # Create processors
-            self._create_camera_processors()
+            # Create processors from DB
+            await self._create_camera_processors()
 
-            # Start each processor in separate thread
-            for processor in self.camera_processors.values():
-                thread = threading.Thread(
-                    target=processor.run, name=f"Thread-{processor.cam_name}"
-                )
-                thread.daemon = True
-                thread.start()
-                self.threads.append(thread)
-
-            logger.info(f"{len(self.threads)} camera(s) started")
+            logger.info(f"{len(self.camera_processors)} camera(s) initialized from database")
 
             if blocking:
                 # Keep main thread alive and wait for stop_event
@@ -113,7 +150,9 @@ class CameraManager:
 
     def stop(self):
         """Stop all processors and cleanup"""
-        self.stop_event.set()
+        for processor in self.camera_processors.values():
+            processor.stop()
+
         logger.info("Stopping Camera Manager...")
 
         # Publish stopped state for all cameras
@@ -128,13 +167,12 @@ class CameraManager:
                     thread.join(timeout=5)
                     if thread.is_alive():
                         logger.warning(f"Thread {thread.name} did not stop gracefully")
+
+            self.stop_event.set()
         except KeyboardInterrupt:
             logger.warning("Force stopping (Ctrl+C during shutdown)...")
         finally:
             self.threads.clear()
             self.camera_processors.clear()
-
-        if self.mqtt_service:
-            self.mqtt_service.disconnect()
 
         logger.info("Camera Manager stopped")
