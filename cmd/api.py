@@ -14,13 +14,14 @@ import logging
 # Add the project root to PYTHONPATH to allow src imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from internal.utils.config_loader import load_config
-from internal.services.mqtt_service import MQTTService
-from internal.services.frame_renderer import FrameRenderer
-from internal.core.camera_manager import CameraManager
-from internal.core.sexual_harassment_detector import SexualHarassmentDetector
-from internal.api.routes import create_router
-from internal.utils.logging_utils import setup_logging
+from src.utils.config_loader import load_config
+from src.services.mqtt_service import MQTTService
+from src.services.frame_renderer import FrameRenderer
+from src.core.camera_manager import CameraManager
+from src.core.sexual_harassment_detector import SexualHarassmentDetector
+from src.api.routes import create_router
+from src.utils.logging_utils import setup_logging
+from src.database.session import init_db
 
 logger = logging.getLogger("API")
 
@@ -51,6 +52,7 @@ def create_app():
     async def lifespan(app: FastAPI):
         try:
             # Startup
+            await init_db()
             camera_manager.start(blocking=False)
 
             yield
@@ -78,10 +80,6 @@ def create_app():
     # Include API routes
     api_router = create_router(camera_manager, config, sexual_harassment_detector, frame_renderer)
     app.include_router(api_router, prefix="/api")
-
-    @app.get("/health", tags=["System"])
-    async def health_check():
-        return {"status": "ok", "message": "Sexual Harassment Detection API is running"}
 
     return app
 

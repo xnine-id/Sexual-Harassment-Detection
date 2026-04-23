@@ -1,4 +1,4 @@
-from internal.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
+from src.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
 import cv2
 from cv2.typing import MatLike
 import threading
@@ -8,11 +8,11 @@ import queue
 import subprocess
 from typing import Dict, Any, Optional
 from threading import Event, Lock
-from internal.services.frame_renderer import FrameRenderer
-from internal.services.mqtt_service import MQTTService
-from internal.core.sexual_harassment_detector import SexualHarassmentDetector
-from internal.services.sexual_harassment_tracker import SexualHarassmentTracker
-from internal.utils.config_loader import CameraConfig, SnapshotConfig
+from src.services.frame_renderer import FrameRenderer
+from src.services.mqtt_service import MQTTService
+from src.core.sexual_harassment_detector import SexualHarassmentDetector
+from src.services.sexual_harassment_tracker import SexualHarassmentTracker
+from src.utils.config_loader import CameraConfig, SnapshotConfig
 
 logger = logging.getLogger("CAM_PROCESSOR")
 

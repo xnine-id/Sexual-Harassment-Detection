@@ -8,9 +8,9 @@ from datetime import datetime
 
 from cv2.typing import MatLike
 
-from internal.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
-from internal.services.mqtt_service import MQTTService
-from internal.utils.config_loader import SnapshotConfig
+from src.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
+from src.services.mqtt_service import MQTTService
+from src.utils.config_loader import SnapshotConfig
 
 logger = logging.getLogger("SEXUAL_HARASSMENT_TRACKER")
 

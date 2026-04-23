@@ -1,14 +1,14 @@
-from internal.services.sexual_harassment_tracker import SexualHarassmentTracker
-from internal.utils.config_loader import SnapshotConfig
+from src.services.sexual_harassment_tracker import SexualHarassmentTracker
+from src.utils.config_loader import SnapshotConfig
 import threading
 import logging
 import asyncio
 from typing import Dict, List, Optional
-from internal.core.camera_processor import CameraProcessor
-from internal.core.sexual_harassment_detector import SexualHarassmentDetector
-from internal.services.mqtt_service import MQTTService
-from internal.services.frame_renderer import FrameRenderer
-from internal.utils.config_loader import CameraConfig
+from src.core.camera_processor import CameraProcessor
+from src.core.sexual_harassment_detector import SexualHarassmentDetector
+from src.services.mqtt_service import MQTTService
+from src.services.frame_renderer import FrameRenderer
+from src.utils.config_loader import CameraConfig
 
 logger = logging.getLogger("CAMERA_MANAGER")
 

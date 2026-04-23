@@ -1,4 +1,4 @@
-from internal.utils.config_loader import DetectionSettings
+from src.utils.config_loader import DetectionSettings
 import cv2
 from cv2.typing import MatLike
 import numpy as np
@@ -8,7 +8,7 @@ from typing import Dict, Any
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
-from internal.utils.model_downloader import download_model
+from src.utils.model_downloader import download_model
 import tensorflow as tf
 
 

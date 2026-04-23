@@ -1,6 +1,6 @@
 detection_settings:
-  model_path: "/home/jeremyjfn/app/Sexual-Harassment-Detection-In-Workplace/storage/private/models/weight.hdf5"
-  output_dir: '/home/jeremyjfn/app/Sexual-Harassment-Detection-In-Workplace/storage/private/output'
+  model_path: "/home/ams/app/skyure/Sexual-Harassment-Detection-In-Workplace/storage/private/models/weight.hdf5"
+  output_dir: '/home/ams/app/skyure/Sexual-Harassment-Detection-In-Workplace/storage/private/output'
   detect_fps: 5
   resize: [224, 224]
 
@@ -12,7 +12,7 @@ cameras:
 
 snapshot:
   enabled: true
-  output_dir: '/home/jeremyjfn/app/Sexual-Harassment-Detection-In-Workplace/storage/private/snapshots'
+  output_dir: '/home/ams/app/skyure/Sexual-Harassment-Detection-In-Workplace/storage/private/snapshots'
 
 mqtt:
   enabled: true

@@ -1,71 +1,34 @@
-from internal.services.video_sexual_harassment_tracker import VideoSexualHarassmentTracker
-from internal.services.sexual_harassment_tracker import SexualHarassmentTracker
+from fastapi import Depends
+from src.api.middleware.auth import verify_token
+from src.services.video_sexual_harassment_tracker import VideoSexualHarassmentTracker
 import mimetypes
 import logging
 import os
 import shutil
 import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File, status, BackgroundTasks
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
-from internal.core.camera_manager import CameraManager
-from internal.core.camera_processor import CameraProcessor
-from internal.core.sexual_harassment_detector import SexualHarassmentDetector
-from internal.services.frame_renderer import FrameRenderer
-from internal.utils.config_loader import Config, CameraConfig, SnapshotConfig
-from internal.api.schemas import JobCreateResponse, JobStatusResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from src.core.camera_processor import CameraProcessor
+from src.core.camera_manager import CameraManager
+from src.core.sexual_harassment_detector import SexualHarassmentDetector
+from src.services.frame_renderer import FrameRenderer
+from src.utils.config_loader import Config, CameraConfig
+from src.api.schemas import JobCreateResponse, JobStatusResponse
 from starlette.concurrency import run_in_threadpool
 
-logger = logging.getLogger("API_ROUTES")
+logger = logging.getLogger("API_PREDICTION")
 
+# In-memory jobs state
+jobs = {}
 
-def create_router(
-    camera_manager: CameraManager,
+def get_prediction_router(
     config: Config,
     sexual_detector: SexualHarassmentDetector,
     renderer: FrameRenderer,
 ):
-    router = APIRouter()
+    router = APIRouter(tags=["Prediction"])
 
-    jobs = {}
-
-    snapshot_dir = config.snapshot.output_dir
     output_dir = config.detection_settings.output_dir
-
-    @router.get(
-        "/snapshots/{date_str}/{filename}",
-        summary="Get snapshot image file",
-        tags=["Snapshot"],
-    )
-    async def get_snapshot(date_str: str, filename: str):
-        """
-        Get snapshot image by date and filename.
-        """
-        if not snapshot_dir:
-            raise HTTPException(
-                status_code=500, detail="Snapshot directory not configured"
-            )
-
-        # Security: Prevent directory traversal by ensuring the resolved path is within snapshot_dir
-        base_dir = os.path.abspath(snapshot_dir)
-        requested_path = os.path.abspath(os.path.join(base_dir, date_str, filename))
-
-        if not requested_path.startswith(base_dir):
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        if not os.path.exists(requested_path):
-            raise HTTPException(status_code=404, detail="Snapshot not found")
-
-        return FileResponse(requested_path, filename=filename)
-
-    @router.get("/video_feed/{camera_name}", tags=["Streaming"])
-    async def video_feed(camera_name: str):
-        """
-        Get video feed from a specific camera.
-        """
-        return StreamingResponse(
-            camera_manager.stream_generator(camera_name),
-            media_type="multipart/x-mixed-replace; boundary=frame",
-        )
 
     def process_image_sync(input_path: str, output_path: str) -> dict:
         """Process image file, run detection and return result"""
@@ -143,16 +106,15 @@ def create_router(
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
         finally:
-            import os as _os
-            if _os.path.exists(temp_input):
-                _os.remove(temp_input)
+            if os.path.exists(temp_input):
+                os.remove(temp_input)
 
     @router.post(
         "/predict/video",
         summary="Predict sexual harassment from uploaded video",
-        tags=["Prediction"],
         response_model=JobCreateResponse,
         status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(verify_token)]
     )
     async def predict_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
@@ -182,9 +144,9 @@ def create_router(
     @router.post(
         "/predict/image",
         summary="Predict sexual harassment from uploaded image",
-        tags=["Prediction"],
         response_model=JobCreateResponse,
         status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(verify_token)]
     )
     async def predict_image(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
@@ -215,8 +177,8 @@ def create_router(
     @router.get(
         "/jobs/{job_id}",
         summary="Get job status",
-        tags=["Prediction"],
         response_model=JobStatusResponse,
+        dependencies=[Depends(verify_token)]
     )
     async def get_job_status(job_id: str):
         """
@@ -227,7 +189,7 @@ def create_router(
         
         return {"data": {"job_id": job_id, **jobs[job_id]}}
 
-    @router.get("/result/{filename}", summary="Get result file", tags=["Prediction"])
+    @router.get("/result/{filename}", summary="Get result file", dependencies=[Depends(verify_token)])
     async def get_result(filename: str):
         """
         Serve result file.

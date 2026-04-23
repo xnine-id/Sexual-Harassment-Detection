@@ -1,11 +1,11 @@
-from internal.utils.config_loader import MQTTConfig
+from src.utils.config_loader import MQTTConfig
 import json
 import os
 import logging
 from datetime import datetime
 from typing import Optional
 from paho.mqtt import client as mqtt
-from internal.utils.config_loader import Config
+from src.utils.config_loader import Config
 
 logger = logging.getLogger("MQTT")
 

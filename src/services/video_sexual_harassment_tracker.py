@@ -3,7 +3,7 @@ import json
 from typing import Dict, Any
 from cv2.typing import MatLike
 
-from internal.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
+from src.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
 
 logger = logging.getLogger("VIDEO_SEXUAL_HARASSMENT_TRACKER")
 
