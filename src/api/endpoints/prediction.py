@@ -7,9 +7,8 @@ import os
 import shutil
 import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File, status, BackgroundTasks
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from src.core.camera_processor import CameraProcessor
-from src.core.camera_manager import CameraManager
 from src.core.sexual_harassment_detector import SexualHarassmentDetector
 from src.services.frame_renderer import FrameRenderer
 from src.utils.config_loader import Config, CameraConfig
@@ -189,7 +188,7 @@ def get_prediction_router(
         
         return {"data": {"job_id": job_id, **jobs[job_id]}}
 
-    @router.get("/result/{filename}", summary="Get result file", dependencies=[Depends(verify_token)])
+    @router.get("/result/{filename}", summary="Get result file")
     async def get_result(filename: str):
         """
         Serve result file.
