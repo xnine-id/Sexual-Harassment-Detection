@@ -1,12 +1,12 @@
 detection_settings:
-  model_path: "/home/ams/app/skyure/Sexual-Harassment-Detection-In-Workplace/storage/private/models/weight.hdf5"
-  output_dir: '/home/ams/app/skyure/Sexual-Harassment-Detection-In-Workplace/storage/private/output'
+  model_path: "/home/ams/app/skyure/Sexual-Harassment-Detection/storage/private/models/weight.hdf5"
+  output_dir: '/home/ams/app/skyure/Sexual-Harassment-Detection/storage/private/output'
   detect_fps: 5
   resize: [224, 224]
 
 snapshot:
   enabled: true
-  output_dir: '/home/ams/app/skyure/Sexual-Harassment-Detection-In-Workplace/storage/private/snapshots'
+  output_dir: '/home/ams/app/skyure/Sexual-Harassment-Detection/storage/private/snapshots'
 
 mqtt:
   enabled: true
