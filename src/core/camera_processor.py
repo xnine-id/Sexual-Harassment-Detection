@@ -344,3 +344,8 @@ class CameraProcessor:
 
     def stop(self):
         self.stop_event.set()
+
+        if self.mqtt_service:
+            self.mqtt_service.publish_state(self.cam_name, False)
+
+        logger.info(f"[{self.cam_name}] Status changed to STOPPED")
