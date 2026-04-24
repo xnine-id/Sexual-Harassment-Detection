@@ -1,3 +1,4 @@
+import asyncio
 from src.services.sexual_harassment_tracker_int import SexualHarassmentTrackerInt
 import cv2
 from cv2.typing import MatLike
@@ -81,13 +82,10 @@ class CameraProcessor:
         """Handle incoming MQTT commands for this camera"""
         run_status: Optional[bool] = payload.get("run")
         if run_status is not None:
-            self.is_running = run_status
-            if self.mqtt_service:
-                self.mqtt_service.publish_state(self.cam_name, self.is_running)
-                status_str = "ENABLED" if run_status else "DISABLED"
-                if not self.is_running:
-                    self.tracker.reset()
-            logger.info(f"[{self.cam_name}] Status changed to {status_str} via MQTT")
+            if run_status:
+                self.resume()
+            else:
+                self.pause()
 
     def _initialize_capture(self):
         """Initialize video capture"""
@@ -349,3 +347,58 @@ class CameraProcessor:
             self.mqtt_service.publish_state(self.cam_name, False)
 
         logger.info(f"[{self.cam_name}] Status changed to STOPPED")
+
+    async def _update_db_enabled(self, enabled: bool):
+        """
+        Persists the is_enabled flag for this camera to the database.
+
+        Args:
+            enabled (bool): The new enabled state to write.
+        """
+        if self._session_factory is None:
+            return
+        try:
+            from sqlalchemy.future import select
+            from src.database.session import get_sessionmaker
+
+            session_factory = get_sessionmaker()
+            async with session_factory() as session:
+                result = await session.execute(
+                    select(Camera).where(Camera.name == self.cam_name)
+                )
+                camera = result.scalar_one_or_none()
+                if camera is not None:
+                    camera.is_enabled = enabled
+                    await session.commit()
+        except Exception:
+            logger.exception(
+                f"[{self.cam_name}] Failed to persist is_enabled={enabled} to DB"
+            )
+
+    def resume(self):
+        self.is_running = True
+
+        if self.mqtt_service:
+            self.mqtt_service.publish_state(self.cam_name, self.is_running)
+
+        # Persist is_enabled=True to DB
+        threading.Thread(
+            target=lambda: asyncio.run(self._update_db_enabled(True)),
+            daemon=True,
+        ).start()
+
+        logger.info(f"[{self.cam_name}] Status changed to ENABLED")
+
+    def pause(self):
+        self.is_running = False
+
+        if self.mqtt_service:
+            self.mqtt_service.publish_state(self.cam_name, self.is_running)
+
+        # Persist is_enabled=False to DB
+        threading.Thread(
+            target=lambda: asyncio.run(self._update_db_enabled(False)),
+            daemon=True,
+        ).start()
+
+        logger.info(f"[{self.cam_name}] Status changed to DISABLED")
