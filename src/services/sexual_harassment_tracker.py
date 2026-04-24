@@ -39,34 +39,37 @@ class SexualHarassmentTracker(SexualHarassmentTrackerInt):
         )
 
         if result:
-            if result["class"] == 1:
-                snapshot = None
-                self.last_harassment_time = now
+            def mqtt_task(frame: MatLike):
+                if result["class"] == 1:
+                    snapshot = None
+                    self.last_harassment_time = now
 
-                if is_new_event:
-                    self.event_id = str(uuid.uuid4())
-                    if self.snapshot_enabled and frame is not None:
-                        snapshot = self._save_snapshot(frame)
-
-                if self.mqtt_service:
-                    self.mqtt_service.publish_event(
-                        event_id=self.event_id,
-                        cam_name=self.cam_name,
-                        confidence=result["score"] * 100,
-                        snapshot=snapshot,
-                    )
-
-            else:
-                if is_new_event:
-                    self.event_id = str(uuid.uuid4())
+                    if is_new_event:
+                        self.event_id = str(uuid.uuid4())
+                        if self.snapshot_enabled and frame is not None:
+                            snapshot = self._save_snapshot(frame)
 
                     if self.mqtt_service:
                         self.mqtt_service.publish_event(
                             event_id=self.event_id,
                             cam_name=self.cam_name,
                             confidence=result["score"] * 100,
-                            event_type="no_harassment",
+                            snapshot=snapshot,
                         )
+
+                else:
+                    if is_new_event:
+                        self.event_id = str(uuid.uuid4())
+
+                        if self.mqtt_service:
+                            self.mqtt_service.publish_event(
+                                event_id=self.event_id,
+                                cam_name=self.cam_name,
+                                confidence=result["score"] * 100,
+                                event_type="no_harassment",
+                            )
+
+            threading.Thread(target=mqtt_task, args=(frame.copy(),), daemon=True).start()
 
     def reset(self):
         self.event_id = None
@@ -78,21 +81,17 @@ class SexualHarassmentTracker(SexualHarassmentTrackerInt):
 
         """Save snapshot in a separate thread to avoid blocking"""
 
-        def save_task():
-            try:
-                final_output_dir = os.path.join(self.output_dir, today)
+        try:
+            final_output_dir = os.path.join(self.output_dir, today)
 
-                os.makedirs(final_output_dir, exist_ok=True)
+            os.makedirs(final_output_dir, exist_ok=True)
 
-                final_output = os.path.join(
-                    final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
-                )
-                cv2.imwrite(final_output, frame)
-            except Exception as e:
-                logger.info(f"[{self.cam_name}] Failed to save snapshot: {e}")
+            final_output = os.path.join(
+                final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
+            )
+            cv2.imwrite(final_output, frame)
+        except Exception as e:
+            logger.info(f"[{self.cam_name}] Failed to save snapshot: {e}")
+            return None
 
-        # Run in background
-        threading.Thread(target=save_task, daemon=True).start()
-
-        # Return path immediately (predicted path)
         return f"/snapshots/{today}/{self.cam_name}_{timestamp}.jpg"

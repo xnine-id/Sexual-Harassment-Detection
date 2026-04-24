@@ -259,7 +259,7 @@ class CameraProcessor:
         """Main frame processing pipeline: Resize -> Detect -> Render -> Track -> Save"""
         # 1. Provide to detector (Detector will handle resize in its run method)
         with self.raw_frame_lock:
-            self.latest_raw_frame = frame
+            self.latest_raw_frame = frame.copy()
         self.new_frame_event.set()
 
         # 2. Get latest result (instant)
@@ -326,7 +326,6 @@ class CameraProcessor:
 
         # Cleanup
         logger.info(f"[{self.cam_name}] Stopping capture processor...")
-        self.new_frame_event.set()
 
         for t in threads:
             if t.is_alive():
