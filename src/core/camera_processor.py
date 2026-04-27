@@ -355,8 +355,6 @@ class CameraProcessor:
         Args:
             enabled (bool): The new enabled state to write.
         """
-        if self._session_factory is None:
-            return
         try:
             from sqlalchemy.future import select
             from src.database.session import get_sessionmaker

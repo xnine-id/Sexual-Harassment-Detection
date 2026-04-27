@@ -21,7 +21,7 @@ from src.core.camera_manager import CameraManager
 from src.core.sexual_harassment_detector import SexualHarassmentDetector
 from src.api.routes import create_router
 from src.utils.logging_utils import setup_logging
-from src.database.session import init_db
+from src.database.session import init_db, close_db
 
 logger = logging.getLogger("API")
 
@@ -63,6 +63,8 @@ def create_app():
             camera_manager.stop()
             if mqtt_service:
                 mqtt_service.disconnect()
+
+            await close_db()
 
     # Initialize FastAPI app
     app = FastAPI(title="Sexual Harassment Detection API", lifespan=lifespan)

@@ -51,3 +51,11 @@ async def init_db():
         # run_sync digunakan untuk menjalankan operasi synchronous (create_all) di dalam async
         await conn.run_sync(Base.metadata.create_all)
     print(f"Database initialized at {DATABASE_URL}")
+
+async def close_db():
+    """Menutup engine database secara rapi."""
+    global _engine
+    if _engine is not None:
+        await _engine.dispose()
+        _engine = None
+        print("Database engine disposed")

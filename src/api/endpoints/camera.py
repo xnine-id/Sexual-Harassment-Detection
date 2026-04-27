@@ -18,9 +18,9 @@ def get_camera_router(camera_manager: CameraManager):
     async def list_cameras(service: CameraService = Depends(get_camera_service)):
         return await service.get_cameras()
 
-    @router.get("/{camera_id}", response_model=CameraResponse)
-    async def get_camera(camera_id: int, service: CameraService = Depends(get_camera_service)):
-        camera = await service.get_camera(camera_id)
+    @router.get("/{camera_name}", response_model=CameraResponse)
+    async def get_camera(camera_name: str, service: CameraService = Depends(get_camera_service)):
+        camera = await service.get_camera(camera_name)
         if not camera:
             raise HTTPException(status_code=404, detail="Camera not found")
         return camera
@@ -31,18 +31,22 @@ def get_camera_router(camera_manager: CameraManager):
         # camera_manager.restart()
         return camera
 
-    @router.put("/{camera_id}", response_model=CameraResponse)
-    async def update_camera(camera_id: int, request: UpdateCameraRequest, service: CameraService = Depends(get_camera_service)):
-        camera = await service.update_camera(camera_id, request)
+    @router.put("/{camera_name}", response_model=CameraResponse)
+    async def update_camera(camera_name: str, request: UpdateCameraRequest, service: CameraService = Depends(get_camera_service)):
+        camera = await service.update_camera(camera_name, request)
         if not camera:
             raise HTTPException(status_code=404, detail="Camera not found")
         return camera
 
-    @router.delete("/{camera_id}", response_model=GenericResponse)
-    async def delete_camera(camera_id: int, service: CameraService = Depends(get_camera_service)):
-        success = await service.delete_camera(camera_id)
+    @router.delete("/{camera_name}", response_model=GenericResponse)
+    async def delete_camera(camera_name: str, service: CameraService = Depends(get_camera_service)):
+        success = await service.delete_camera(camera_name)
         if not success:
             raise HTTPException(status_code=404, detail="Camera not found")
         return GenericResponse(status="success", message="Camera deleted successfully")
+
+    @router.post("/sync", response_model=List[CameraResponse])
+    async def sync_cameras(request: List[AddCameraRequest], service: CameraService = Depends(get_camera_service)):
+        return await service.sync_cameras(request)
 
     return router

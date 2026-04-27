@@ -14,8 +14,8 @@ class CameraService:
         result = await self.session.execute(select(Camera))
         return result.scalars().all()
 
-    async def get_camera(self, camera_id: int) -> Optional[Camera]:
-        result = await self.session.execute(select(Camera).where(Camera.id == camera_id))
+    async def get_camera(self, camera_name: str) -> Optional[Camera]:
+        result = await self.session.execute(select(Camera).where(Camera.name == camera_name))
         return result.scalar_one_or_none()
 
     async def create_camera(self, data: AddCameraRequest) -> Camera:
@@ -36,8 +36,8 @@ class CameraService:
 
         return new_camera
 
-    async def update_camera(self, camera_id: int, data: UpdateCameraRequest) -> Optional[Camera]:
-        camera = await self.get_camera(camera_id)
+    async def update_camera(self, camera_name: str, data: UpdateCameraRequest) -> Optional[Camera]:
+        camera = await self.get_camera(camera_name)
         if not camera:
             return None
 
@@ -58,8 +58,8 @@ class CameraService:
 
         return camera
 
-    async def delete_camera(self, camera_id: int) -> bool:
-        camera = await self.get_camera(camera_id)
+    async def delete_camera(self, camera_name: str) -> bool:
+        camera = await self.get_camera(camera_name)
         if not camera:
             return False
 
@@ -71,3 +71,49 @@ class CameraService:
         self.camera_manager.remove_camera_processor(cam_name)
 
         return True
+
+    async def sync_cameras(self, data: List[AddCameraRequest]) -> List[Camera]:
+        existing_cameras = await self.get_cameras()
+        existing_map = {cam.name: cam for cam in existing_cameras}
+        new_names = {item.name for item in data}
+
+        # 1. Delete cameras not in the new list
+        for name, camera in existing_map.items():
+            if name not in new_names:
+                await self.session.delete(camera)
+                self.camera_manager.remove_camera_processor(name)
+
+        # 2. Add or Update cameras
+        synced_cameras = []
+        for item in data:
+            if item.name in existing_map:
+                # Update
+                camera = existing_map[item.name]
+                camera.url = item.url
+                camera.detect_fps = item.detect_fps
+                camera.is_enabled = item.is_enabled
+                camera.snapshot_enabled = item.snapshot_enabled
+                camera.mqtt_enabled = item.mqtt_enabled
+                self.camera_manager.update_camera_processor(camera)
+            else:
+                # Add
+                camera = Camera(
+                    name=item.name,
+                    url=item.url,
+                    detect_fps=item.detect_fps,
+                    is_enabled=item.is_enabled,
+                    snapshot_enabled=item.snapshot_enabled,
+                    mqtt_enabled=item.mqtt_enabled
+                )
+                self.session.add(camera)
+                self.camera_manager.add_camera_processor(camera)
+            
+            synced_cameras.append(camera)
+
+        await self.session.commit()
+        
+        # Refresh all synced cameras to get their IDs and updated state
+        for cam in synced_cameras:
+            await self.session.refresh(cam)
+        
+        return synced_cameras
